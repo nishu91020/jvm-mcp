@@ -5,8 +5,8 @@ import dev.jvmmcp.core.attach.JvmAttachService;
 import dev.jvmmcp.core.jmx.JmxConnectionManager;
 import dev.jvmmcp.core.jmx.ThreadMXBeanClient;
 import dev.jvmmcp.core.model.*;
+import picocli.CommandLine.ArgGroup;
 import picocli.CommandLine.Command;
-import picocli.CommandLine.Option;
 import picocli.CommandLine.Parameters;
 
 import java.util.List;
@@ -23,14 +23,8 @@ public class ThreadsCommand implements Callable<Integer> {
     @Parameters(index = "0", description = "Target JVM Process ID (PID)")
     long pid;
 
-    @Option(names = {"--deadlocks", "-d"}, description = "Scan exclusively for deadlocks")
-    boolean deadlocksOnly;
-
-    @Option(names = {"--dump", "-D"}, description = "Display full thread dump with stack traces")
-    boolean dump;
-
-    @Option(names = {"--blocked", "-b"}, description = "List only blocked threads")
-    boolean blockedOnly;
+    @ArgGroup(exclusive=true, multiplicity = "1")
+    ThreadFlags threadFlags;
 
     private final JvmAttachService attachService;
 
@@ -60,31 +54,27 @@ public class ThreadsCommand implements Callable<Integer> {
             com.sun.tools.attach.VirtualMachine vm = attachResult.virtualMachine().orElse(null);
             boolean[] jmxManagerOwnsVm = {false};
             try {
-                try (JmxConnectionManager jmxManager = vm != null 
-                        ? JmxConnectionManager.connect(vm, pid) 
+                try (JmxConnectionManager jmxManager = vm != null
+                        ? JmxConnectionManager.connect(vm, pid)
                         : JmxConnectionManager.connectLocal()) {
                     jmxManagerOwnsVm[0] = true;
 
                     ThreadMXBeanClient client = createThreadMXBeanClient(jmxManager);
 
-                if (deadlocksOnly) {
+                if (threadFlags.deadlocksOnly) {
                     printDeadlocks(client);
-                    return 0;
                 }
 
-                if (blockedOnly) {
+                if (threadFlags.blockedOnly) {
                     printBlockedThreads(client);
-                    return 0;
                 }
 
-                if (dump) {
+                if (threadFlags.dump) {
                     printThreadDump(client);
-                    return 0;
                 }
 
                 printThreadSummary(client);
-                printDeadlocks(client);
-                return 0;
+                return (threadFlags.deadlocksOnly || threadFlags.blockedOnly || threadFlags.dump) ? 0 : 1;
             }
         } finally {
             if (vm != null && !jmxManagerOwnsVm[0]) {
@@ -107,11 +97,11 @@ public class ThreadsCommand implements Callable<Integer> {
         System.out.println("=".repeat(80));
         System.out.printf(" JVM THREAD DIAGNOSTICS FOR PID %d%n", pid);
         System.out.println("=".repeat(80));
-        System.out.printf("Total Threads : %-6d (Peak: %d, Daemon: %d)%n", 
+        System.out.printf("Total Threads : %-6d (Peak: %d, Daemon: %d)%n",
             summary.totalCount(), summary.peakCount(), summary.daemonCount());
-        System.out.printf("RUNNABLE      : %-6d WAITING : %-6d%n", 
+        System.out.printf("RUNNABLE      : %-6d WAITING : %-6d%n",
             summary.runnableCount(), summary.waitingCount());
-        System.out.printf("TIMED_WAITING : %-6d BLOCKED : %-6d%n", 
+        System.out.printf("TIMED_WAITING : %-6d BLOCKED : %-6d%n",
             summary.timedWaitingCount(), summary.blockedCount());
     }
 
@@ -140,7 +130,7 @@ public class ThreadsCommand implements Callable<Integer> {
     }
 
     private void printBlockedThreads(ThreadMXBeanClient client) throws Exception {
-        List<BlockedThreadDetail> blocked = client.findBlockedThreads(0);
+        List<BlockedThreadDetail> blocked = client.findBlockedThreads(threadFlags.threshold);
 
         System.out.println("=".repeat(80));
         System.out.printf(" BLOCKED THREADS FOR PID %d (%d found)%n", pid, blocked.size());
@@ -165,7 +155,7 @@ public class ThreadsCommand implements Callable<Integer> {
         ThreadDump dump = client.getThreadDump(pid);
 
         System.out.println("=".repeat(80));
-        System.out.printf(" THREAD DUMP FOR PID %d (Timestamp: %s, Total: %d)%n", 
+        System.out.printf(" THREAD DUMP FOR PID %d (Timestamp: %s, Total: %d)%n",
             pid, dump.timestamp(), dump.totalCount());
         System.out.println("=".repeat(80));
 
