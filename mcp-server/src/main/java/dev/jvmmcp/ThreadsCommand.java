@@ -25,11 +25,14 @@ public class ThreadsCommand implements Callable<Integer> {
     @Parameters(index = "0", description = "Target JVM Process ID (PID)")
     long pid;
 
-    @ArgGroup(exclusive=true, multiplicity = "1")
+    @ArgGroup(exclusive=true, multiplicity = "0..1")
     ThreadFlags threadFlags;
 
     @Option(names = {"--threshold-ms","-t"},description = "Threshold for blocked threads, default to 0")
     int threshold =0;
+
+    @Option(names = {"--json"}, description = "Output thread summary in JSON format")
+    boolean json;
 
     private final JvmAttachService attachService;
 
@@ -68,32 +71,24 @@ public class ThreadsCommand implements Callable<Integer> {
 
                     ThreadMXBeanClient client = createThreadMXBeanClient(jmxManager);
 
+                    if (json) {
+                        System.out.println(SimpleJson.toJson(client.getThreadSummary(pid)));
+                        return 0;
+                    }
+
                     if (!threadFlags.blockedOnly && !threadFlags.deadlocksOnly && !threadFlags.dump && threshold == 0) {
                         printThreadSummary(client);
                         printDeadlocks(client);
                         return 0;
                     }
-                if (json) {
-                    System.out.println(SimpleJson.toJson(client.getThreadSummary(pid)));
-                    return 0;
-                }
 
-                if (deadlocksOnly) {
-                    printDeadlocks(client);
-                    return 0;
-                }
-
-                    if (threadFlags.blockedOnly) {
-                        printBlockedThreads(client);
-                    }
-
-                    if (threshold > 0) {
-                        System.out.printf("Applying threshold: %d ms%n", threshold);
+                    if (threshold > 0 || threadFlags.blockedOnly) {
                         printBlockedThreads(client);
                     }
 
                     if (threadFlags.deadlocksOnly) {
                         printDeadlocks(client);
+                        return 0;
                     }
 
                     if (threadFlags.dump) {

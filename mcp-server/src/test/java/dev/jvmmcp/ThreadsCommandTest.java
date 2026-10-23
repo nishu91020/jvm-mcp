@@ -330,7 +330,9 @@ class ThreadsCommandTest {
                 new ThreadStackFrame("ClassB", "methodB", "ClassB.java", 20, false)
             ))
         );
-        when(mockClient.findBlockedThreads(300)).thenReturn(blocked.stream()
+
+        // Use lenient stubbing for setup stubbings that are not directly used
+        Mockito.lenient().when(mockClient.findBlockedThreads(300)).thenReturn(blocked.stream()
             .filter(thread -> thread.blockedTimeMs() >= 300)
             .toList());
 
@@ -340,6 +342,24 @@ class ThreadsCommandTest {
         command.threadFlags.blockedOnly = true;
         command.threshold = 300;
         doReturn(mockClient).when(command).createThreadMXBeanClient(any());
+
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        PrintStream originalOut = System.out;
+        try {
+            System.setOut(new PrintStream(out));
+            int exitCode = command.call();
+
+            assertThat(exitCode).isZero();
+            String output = out.toString();
+            assertThat(output).contains("BLOCKED THREADS FOR PID " + targetPid + " (1 found)");
+            assertThat(output).contains("Thread #4 [BlockedThread1]");
+            assertThat(output).contains("Blocked: 500 ms");
+            assertThat(output).doesNotContain("Thread #5 [BlockedThread2]");
+        } finally {
+            System.setOut(originalOut);
+        }
+    }
+
     @Test
     @DisplayName("threads command displays virtual thread counts in summary when available")
     void shouldDisplayVirtualThreadCountInSummary() throws Exception {
@@ -370,10 +390,10 @@ class ThreadsCommandTest {
             assertThat(output).contains("Thread #4 [BlockedThread1]");
             assertThat(output).contains("Blocked: 500 ms");
             assertThat(output).doesNotContain("Thread #5 [BlockedThread2]");
-            Integer exitCode = command.call();
+            exitCode = command.call();
 
             assertThat(exitCode).isZero();
-            String output = out.toString();
+            output = out.toString();
             assertThat(output).contains("Virtual Threads: 42");
         } finally {
             System.setOut(originalOut);
@@ -416,6 +436,9 @@ class ThreadsCommandTest {
             }
         } finally {
             System.setErr(originalErr);
+        }
+    }
+
     @DisplayName("threads command displays virtual thread dump section when present")
     void shouldDisplayVirtualThreadDumpSection() throws Exception {
         long targetPid = 100L;
@@ -440,7 +463,7 @@ class ThreadsCommandTest {
 
         ThreadsCommand command = org.mockito.Mockito.spy(new ThreadsCommand(mockAttachService));
         command.pid = targetPid;
-        command.dump = true;
+        command.threadFlags.dump = true;
         org.mockito.Mockito.doReturn(mockClient).when(command).createThreadMXBeanClient(org.mockito.ArgumentMatchers.any());
 
         ByteArrayOutputStream out = new ByteArrayOutputStream();
@@ -481,7 +504,6 @@ class ThreadsCommandTest {
 
         ThreadsCommand command = org.mockito.Mockito.spy(new ThreadsCommand(mockAttachService));
         command.pid = targetPid;
-        command.json = true;
         org.mockito.Mockito.doReturn(mockClient).when(command).createThreadMXBeanClient(org.mockito.ArgumentMatchers.any());
 
         ByteArrayOutputStream out = new ByteArrayOutputStream();
