@@ -8,6 +8,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
+import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
 import picocli.CommandLine;
 import dev.jvmmcp.core.jmx.ThreadMXBeanClient;
@@ -19,6 +20,8 @@ import java.io.PrintStream;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -41,9 +44,9 @@ class ThreadsCommandTest {
     void shouldFailOnMissingOrInvalidPid() {
         CommandLine cmd = new CommandLine(new JvmMcp());
 
-        int noPidExit = cmd.execute("threads");
-        int negativePidExit = cmd.execute("threads", "-1");
-        int zeroPidExit = cmd.execute("threads", "0");
+        int noPidExit = cmd.execute("threads","-d");
+        int negativePidExit = cmd.execute("threads","-d", "-1");
+        int zeroPidExit = cmd.execute("threads","-d", "0");
 
         assertThat(noPidExit).isNotZero();
         assertThat(negativePidExit).isEqualTo(1);
@@ -114,7 +117,7 @@ class ThreadsCommandTest {
         ThreadsCommand command = org.mockito.Mockito.spy(new ThreadsCommand(mockAttachService));
         command.pid = targetPid;
         command.threadFlags.deadlocksOnly = true;
-        org.mockito.Mockito.doReturn(mockClient).when(command).createThreadMXBeanClient(org.mockito.ArgumentMatchers.any());
+        doReturn(mockClient).when(command).createThreadMXBeanClient(any());
 
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         PrintStream originalOut = System.out;
@@ -160,7 +163,7 @@ class ThreadsCommandTest {
         ThreadsCommand command = org.mockito.Mockito.spy(new ThreadsCommand(mockAttachService));
         command.pid = targetPid;
         command.threadFlags.dump = true;
-        org.mockito.Mockito.doReturn(mockClient).when(command).createThreadMXBeanClient(org.mockito.ArgumentMatchers.any());
+        doReturn(mockClient).when(command).createThreadMXBeanClient(any());
 
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         PrintStream originalOut = System.out;
@@ -241,7 +244,7 @@ class ThreadsCommandTest {
         ThreadsCommand command = org.mockito.Mockito.spy(new ThreadsCommand(mockAttachService));
         command.pid = targetPid;
         command.threadFlags.blockedOnly = true;
-        org.mockito.Mockito.doReturn(mockClient).when(command).createThreadMXBeanClient(org.mockito.ArgumentMatchers.any());
+        doReturn(mockClient).when(command).createThreadMXBeanClient(any());
 
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         PrintStream originalOut = System.out;
@@ -333,7 +336,7 @@ class ThreadsCommandTest {
         command.pid = targetPid;
         command.threadFlags = new ThreadFlags();
         command.threadFlags.blockedOnly = true;
-        command.threadFlags.threshold = 300;
+        command.threshold = 300;
         doReturn(mockClient).when(command).createThreadMXBeanClient(any());
 
         ByteArrayOutputStream out = new ByteArrayOutputStream();
@@ -369,8 +372,24 @@ class ThreadsCommandTest {
             System.setErr(new PrintStream(err));
             int exitCode = command.call();
 
-            assertThat(exitCode).isEqualTo(1);
-            assertThat(err.toString()).contains("Error: At least one flag must be specified.");
+            assertThat(exitCode).isEqualTo(0);
+            ByteArrayOutputStream out = new ByteArrayOutputStream();
+            PrintStream originalOut = System.out;
+            try {
+                System.setOut(new PrintStream(out));
+                exitCode = command.call();
+
+                assertThat(exitCode).isZero();
+                String output = out.toString();
+                assertThat(output).contains("=".repeat(80));
+                assertThat(output).contains("JVM THREAD DIAGNOSTICS FOR PID " + targetPid);
+                assertThat(output).contains("Total Threads");
+                assertThat(output).contains("RUNNABLE");
+                assertThat(output).contains("DEADLOCK STATUS");
+                assertThat(output).contains("No deadlocked threads detected.");
+            } finally {
+                System.setOut(originalOut);
+            }
         } finally {
             System.setErr(originalErr);
         }

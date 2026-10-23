@@ -11,8 +11,5 @@ public class ThreadFlags {
 
     @Option(names = {"--blocked", "-b"}, description = "List only blocked threads")
     boolean blockedOnly;
-
-    @Option(names = {"--threshold-ms","-t"},description = "Threshold for blocked threads, default to 0")
-    int threshold =0;
 }
 

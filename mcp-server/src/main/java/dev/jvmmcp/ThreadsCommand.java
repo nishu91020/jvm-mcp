@@ -7,6 +7,7 @@ import dev.jvmmcp.core.jmx.ThreadMXBeanClient;
 import dev.jvmmcp.core.model.*;
 import picocli.CommandLine.ArgGroup;
 import picocli.CommandLine.Command;
+import picocli.CommandLine.Option;
 import picocli.CommandLine.Parameters;
 
 import java.util.List;
@@ -26,14 +27,19 @@ public class ThreadsCommand implements Callable<Integer> {
     @ArgGroup(exclusive=true, multiplicity = "1")
     ThreadFlags threadFlags;
 
+    @Option(names = {"--threshold-ms","-t"},description = "Threshold for blocked threads, default to 0")
+    int threshold =0;
+
     private final JvmAttachService attachService;
 
     public ThreadsCommand() {
         this.attachService = new JvmAttachService();
+        this.threadFlags = new ThreadFlags();
     }
 
     public ThreadsCommand(JvmAttachService attachService) {
         this.attachService = attachService;
+        this.threadFlags = new ThreadFlags();
     }
 
     @Override
@@ -61,29 +67,42 @@ public class ThreadsCommand implements Callable<Integer> {
 
                     ThreadMXBeanClient client = createThreadMXBeanClient(jmxManager);
 
-                if (threadFlags.deadlocksOnly) {
-                    printDeadlocks(client);
-                }
+                    if (!threadFlags.blockedOnly && !threadFlags.deadlocksOnly && !threadFlags.dump && threshold == 0) {
+                        printThreadSummary(client);
+                        printDeadlocks(client);
+                        return 0;
+                    }
 
-                if (threadFlags.blockedOnly) {
-                    printBlockedThreads(client);
-                }
+                    if (threadFlags.blockedOnly) {
+                        printBlockedThreads(client);
+                    }
 
-                if (threadFlags.dump) {
-                    printThreadDump(client);
-                }
+                    if (threshold > 0) {
+                        System.out.printf("Applying threshold: %d ms%n", threshold);
+                        printBlockedThreads(client);
+                    }
 
-                printThreadSummary(client);
-                return (threadFlags.deadlocksOnly || threadFlags.blockedOnly || threadFlags.dump) ? 0 : 1;
+                    if (threadFlags.deadlocksOnly) {
+                        printDeadlocks(client);
+                    }
+
+                    if (threadFlags.dump) {
+                        printThreadDump(client);
+                    }
+
+                    if (!threadFlags.blockedOnly && !threadFlags.deadlocksOnly && !threadFlags.dump && threshold == 0) {
+                        printThreadSummary(client);
+                    }
+                    return 0;
+                }
+            } finally {
+                if (vm != null && !jmxManagerOwnsVm[0]) {
+                    try {
+                        attachService.detach(vm);
+                    } catch (Exception ignored) {
+                    }
+                }
             }
-        } finally {
-            if (vm != null && !jmxManagerOwnsVm[0]) {
-                try {
-                    attachService.detach(vm);
-                } catch (Exception ignored) {
-                }
-            }
-        }
 
         } catch (Exception e) {
             System.err.println("[jvm-mcp] Error querying thread metrics: " + e.getMessage());
@@ -130,7 +149,7 @@ public class ThreadsCommand implements Callable<Integer> {
     }
 
     private void printBlockedThreads(ThreadMXBeanClient client) throws Exception {
-        List<BlockedThreadDetail> blocked = client.findBlockedThreads(threadFlags.threshold);
+        List<BlockedThreadDetail> blocked = client.findBlockedThreads(threshold);
 
         System.out.println("=".repeat(80));
         System.out.printf(" BLOCKED THREADS FOR PID %d (%d found)%n", pid, blocked.size());
