@@ -6,6 +6,7 @@ import dev.jvmmcp.core.jmx.JmxConnectionManager;
 import dev.jvmmcp.core.jmx.ThreadMXBeanClient;
 import dev.jvmmcp.core.model.*;
 import picocli.CommandLine.ArgGroup;
+import dev.jvmmcp.core.util.SimpleJson;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 import picocli.CommandLine.Parameters;
@@ -72,6 +73,15 @@ public class ThreadsCommand implements Callable<Integer> {
                         printDeadlocks(client);
                         return 0;
                     }
+                if (json) {
+                    System.out.println(SimpleJson.toJson(client.getThreadSummary(pid)));
+                    return 0;
+                }
+
+                if (deadlocksOnly) {
+                    printDeadlocks(client);
+                    return 0;
+                }
 
                     if (threadFlags.blockedOnly) {
                         printBlockedThreads(client);
@@ -122,6 +132,9 @@ public class ThreadsCommand implements Callable<Integer> {
             summary.runnableCount(), summary.waitingCount());
         System.out.printf("TIMED_WAITING : %-6d BLOCKED : %-6d%n",
             summary.timedWaitingCount(), summary.blockedCount());
+        if (summary.virtualThreads() != null) {
+            System.out.printf("Virtual Threads: %d%n", summary.virtualThreads().totalCount());
+        }
     }
 
     private void printDeadlocks(ThreadMXBeanClient client) throws Exception {
@@ -192,6 +205,19 @@ public class ThreadsCommand implements Callable<Integer> {
                 System.out.println("    at " + frame);
             }
             System.out.println();
+        }
+
+        if (dump.virtualThreads() != null && !dump.virtualThreads().isEmpty()) {
+            System.out.println("-".repeat(80));
+            System.out.printf(" VIRTUAL THREADS (%d found)%n", dump.virtualThreads().size());
+            System.out.println("-".repeat(80));
+            for (ThreadDetail t : dump.virtualThreads()) {
+                System.out.printf("\"%s\" #%d [%s]%n", t.threadName(), t.threadId(), t.state());
+                for (ThreadStackFrame frame : t.stackTrace()) {
+                    System.out.println("    at " + frame);
+                }
+                System.out.println();
+            }
         }
     }
 
