@@ -165,7 +165,7 @@ class ThreadsCommandTest {
         ThreadsCommand command = org.mockito.Mockito.spy(new ThreadsCommand(mockAttachService));
         command.pid = targetPid;
         command.threadFlags.dump = true;
-        doReturn(mockClient).when(command).createThreadMXBeanClient(any());
+        org.mockito.Mockito.doReturn(mockClient).when(command).createThreadMXBeanClient(org.mockito.ArgumentMatchers.any());
 
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         PrintStream originalOut = System.out;
@@ -246,7 +246,7 @@ class ThreadsCommandTest {
         ThreadsCommand command = org.mockito.Mockito.spy(new ThreadsCommand(mockAttachService));
         command.pid = targetPid;
         command.threadFlags.blockedOnly = true;
-        doReturn(mockClient).when(command).createThreadMXBeanClient(any());
+        org.mockito.Mockito.doReturn(mockClient).when(command).createThreadMXBeanClient(org.mockito.ArgumentMatchers.any());
 
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         PrintStream originalOut = System.out;
@@ -341,7 +341,7 @@ class ThreadsCommandTest {
         command.threadFlags = new ThreadFlags();
         command.threadFlags.blockedOnly = true;
         command.threshold = 300;
-        doReturn(mockClient).when(command).createThreadMXBeanClient(any());
+        org.mockito.Mockito.doReturn(mockClient).when(command).createThreadMXBeanClient(org.mockito.ArgumentMatchers.any());
 
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         PrintStream originalOut = System.out;
@@ -382,7 +382,7 @@ class ThreadsCommandTest {
         PrintStream originalOut = System.out;
         try {
             System.setOut(new PrintStream(out));
-            int exitCode = command.call();
+            Integer exitCode = command.call();
 
             assertThat(exitCode).isZero();
             String output = out.toString();
