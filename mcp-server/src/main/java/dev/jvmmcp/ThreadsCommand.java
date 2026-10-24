@@ -78,13 +78,13 @@ public class ThreadsCommand implements Callable<Integer> {
                         return 0;
                     }
 
-                    if (threshold > 0 || flags.blockedOnly) {
-                        printBlockedThreads(client);
-                    }
-
                     if (flags.deadlocksOnly) {
                         printDeadlocks(client);
                         return 0;
+                    }
+
+                    if (threshold > 0 || flags.blockedOnly) {
+                        printBlockedThreads(client);
                     }
 
                     if (flags.dump) {
@@ -93,6 +93,7 @@ public class ThreadsCommand implements Callable<Integer> {
 
                     if (!flags.blockedOnly && !flags.deadlocksOnly && !flags.dump && threshold == 0) {
                         printThreadSummary(client);
+                        printDeadlocks(client);
                     }
                     return 0;
                 }
