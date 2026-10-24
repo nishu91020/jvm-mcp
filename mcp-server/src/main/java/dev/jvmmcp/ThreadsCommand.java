@@ -97,6 +97,7 @@ public class ThreadsCommand implements Callable<Integer> {
                     }
                     return 0;
                 }
+
             } finally {
                 if (vm != null && !jmxManagerOwnsVm[0]) {
                     try {
