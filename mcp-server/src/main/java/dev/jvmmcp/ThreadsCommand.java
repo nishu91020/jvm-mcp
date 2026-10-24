@@ -25,7 +25,7 @@ public class ThreadsCommand implements Callable<Integer> {
     @Parameters(index = "0", description = "Target JVM Process ID (PID)")
     long pid;
 
-    @ArgGroup(exclusive=true, multiplicity = "0..1")
+    @ArgGroup(multiplicity = "0..1")
     ThreadFlags threadFlags;
 
     @Option(names = {"--threshold-ms","-t"},description = "Threshold for blocked threads, default to 0")
@@ -53,6 +53,8 @@ public class ThreadsCommand implements Callable<Integer> {
             return 1;
         }
 
+        ThreadFlags flags = threadFlags != null ? threadFlags : new ThreadFlags();
+
         try {
             AttachResult attachResult = attachService.attach(String.valueOf(pid));
 
@@ -76,26 +78,20 @@ public class ThreadsCommand implements Callable<Integer> {
                         return 0;
                     }
 
-                    if (!threadFlags.blockedOnly && !threadFlags.deadlocksOnly && !threadFlags.dump && threshold == 0) {
-                        printThreadSummary(client);
-                        printDeadlocks(client);
-                        return 0;
-                    }
-
-                    if (threshold > 0 || threadFlags.blockedOnly) {
+                    if (threshold > 0 || flags.blockedOnly) {
                         printBlockedThreads(client);
                     }
 
-                    if (threadFlags.deadlocksOnly) {
+                    if (flags.deadlocksOnly) {
                         printDeadlocks(client);
                         return 0;
                     }
 
-                    if (threadFlags.dump) {
+                    if (flags.dump) {
                         printThreadDump(client);
                     }
 
-                    if (!threadFlags.blockedOnly && !threadFlags.deadlocksOnly && !threadFlags.dump && threshold == 0) {
+                    if (!flags.blockedOnly && !flags.deadlocksOnly && !flags.dump && threshold == 0) {
                         printThreadSummary(client);
                     }
                     return 0;
